@@ -21,17 +21,17 @@ class ImagePaletteModule internal constructor(context: ReactApplicationContext) 
     const val NAME = "ImagePalette"
   }
 
-  private fun getHeadersFromConfig(config: ReadableMap): MutableMap<String, String> {
+  private fun getHeadersFromConfig(config: ReadableMap?): MutableMap<String, String> {
     val headers = mutableMapOf<String, String>()
-    val configHeaders = config.getMap("headers")
 
+    val configHeaders = config?.getMap("headers")
     configHeaders?.let {
       val iterator = it.keySetIterator()
       while (iterator.hasNextKey()) {
         val key = iterator.nextKey()
         when (it.getType(key)) {
           ReadableType.String -> headers[key] = it.getString(key) ?: ""
-          else -> throw IllegalArgumentException("Unsupported type")
+          else -> throw IllegalArgumentException("Unsupported header type for key: $key")
         }
       }
     }
@@ -39,12 +39,16 @@ class ImagePaletteModule internal constructor(context: ReactApplicationContext) 
     return headers
   }
 
-  private fun getPixelSpacingFromConfig(config: ReadableMap): Int {
+  private fun getPixelSpacingFromConfig(config: ReadableMap?): Int {
     return try {
-      config.getInt("pixelSpacingAndroid")
+      config?.getInt("pixelSpacingAndroid") ?: 5
     } catch (exception: Exception) {
       5
     }
+  }
+
+  private fun getFallbackColorFromConfig(config: ReadableMap?): String {
+    return config?.getString("fallbackColor") ?: "#fff"
   }
 
   private fun parseSegments(segments: ReadableArray): ArrayList<ImagePalette.ImageSegmentConfig> {
@@ -52,58 +56,47 @@ class ImagePaletteModule internal constructor(context: ReactApplicationContext) 
 
     for (i in 0 until segments.size()) {
       val segmentMap = segments.getMap(i)
-
-      segmentsParsed.add(
-        ImagePalette.ImageSegmentConfig(
-          fromY = segmentMap.getInt("fromY"),
-          toY = segmentMap.getInt("toY"),
-          fromX = segmentMap.getInt("fromX"),
-          toX = segmentMap.getInt("toX"),
+      if (segmentMap != null) {
+        segmentsParsed.add(
+          ImagePalette.ImageSegmentConfig(
+            fromY = segmentMap.getInt("fromY"),
+            toY = segmentMap.getInt("toY"),
+            fromX = segmentMap.getInt("fromX"),
+            toX = segmentMap.getInt("toX"),
+          )
         )
-      )
+      }
     }
 
     return segmentsParsed
   }
 
-
-  private fun getFallbackColorFromConfig(config: ReadableMap): String {
-    return config.getString("fallbackColor") ?: "#fff"
-  }
-
   @ReactMethod
-  override fun getPalette(uri: String, config: ReadableMap, promise: Promise) {
-
-    val headers = this.getHeadersFromConfig(config)
-
-    val fallback = this.getFallbackColorFromConfig(config)
+  override fun getPalette(uri: String, config: ReadableMap?, promise: Promise) {
+    val headers = getHeadersFromConfig(config)
+    val fallback = getFallbackColorFromConfig(config)
 
     imgPalette.getPalette(uri, context, fallback, headers, promise)
   }
 
   @ReactMethod
-  override fun getAverageColor(uri: String, config: ReadableMap, promise: Promise) {
-
+  override fun getAverageColor(uri: String, config: ReadableMap?, promise: Promise) {
     val headers = getHeadersFromConfig(config)
-
-    val pixelSpacing = this.getPixelSpacingFromConfig(config)
+    val pixelSpacing = getPixelSpacingFromConfig(config)
 
     imgPalette.getAverageColor(uri, context, headers, pixelSpacing, promise)
   }
-
 
   @ReactMethod
   override fun getSegmentsAverageColor(
     uri: String,
     segments: ReadableArray,
-    config: ReadableMap,
+    config: ReadableMap?,
     promise: Promise
   ) {
-    val headers = this.getHeadersFromConfig(config)
-
-    val segmentsParsed = this.parseSegments(segments)
-
-    val pixelSpacing = this.getPixelSpacingFromConfig(config)
+    val headers = getHeadersFromConfig(config)
+    val segmentsParsed = parseSegments(segments)
+    val pixelSpacing = getPixelSpacingFromConfig(config)
 
     imgPalette.getSegmentsAverageColor(
       uri,
@@ -119,13 +112,12 @@ class ImagePaletteModule internal constructor(context: ReactApplicationContext) 
   override fun getSegmentsPalette(
     uri: String,
     segments: ReadableArray,
-    config: ReadableMap,
+    config: ReadableMap?,
     promise: Promise
   ) {
-    val headers = this.getHeadersFromConfig(config)
-
-    val segmentsParsed = this.parseSegments(segments)
-    val fallback = this.getFallbackColorFromConfig(config)
+    val headers = getHeadersFromConfig(config)
+    val segmentsParsed = parseSegments(segments)
+    val fallback = getFallbackColorFromConfig(config)
 
     imgPalette.getSegmentsPalette(
       uri,
